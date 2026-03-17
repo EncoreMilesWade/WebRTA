@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Audio Spectrum Analyzer</title>
+<style>
+  body { margin:0; font-family:sans-serif; background:#111; color:#fff; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; touch-action: manipulation; }
+  #info { position:absolute; top:10px; left:10px; font-size:16px; line-height:1.2; text-align:right; }
+  #hamburger { position:absolute; top:10px; right:10px; font-size:24px; cursor:pointer; }
+  #settings { position:absolute; top:40px; right:10px; background:#222; padding:10px; border-radius:5px; display:none; }
+  select { margin-top:5px; }
+  #welcome { position:absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); color:#fff;
+             display:flex; align-items:center; justify-content:center; flex-direction:column; font-size:20px; }
+  #welcome button { margin-top:20px; padding:10px 20px; font-size:18px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="welcome">
+  <div>Welcome! Click "OK" to start.</div>
+  <div>Then click or tap the screen to start the RTA.</div>
+  <button id="startBtn">OK</button>
+</div>
+
+<div id="info">Strongest: -- Hz</div>
+<div id="hamburger">&#9776;</div>
+<div id="settings">
+  <label><input type="checkbox" id="hpfToggle"> High-pass filter</label>
+  <br>
+  <select id="hpfFreq">
+    <option value="60">60 Hz</option>
+    <option value="120">120 Hz</option>
+    <option value="250">250 Hz</option>
+    <option value="400">400 Hz</option>
+  </select>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+(async function(){
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const info = document.getElementById('info');
+  const hamburger = document.getElementById('hamburger');
+  const settings = document.getElementById('settings');
+  const hpfToggle = document.getElementById('hpfToggle');
+  const hpfFreq = document.getElementById('hpfFreq');
+  const welcome = document.getElementById('welcome');
+  const startBtn = document.getElementById('startBtn');
+
+  let running = false;
+  let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  let source, analyser, hpf;
+
+  let fftSize = window.innerWidth < 600 ? 1024 : 2048;
+  let smoothingTime = 0.7;
+
+  // Microphone access immediately
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    source = audioCtx.createMediaStreamSource(stream);
+  } catch(e) {
+    alert('Microphone access denied or not supported');
+    console.error(e);
+    return;
+  }
+
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = fftSize;
+  analyser.smoothingTimeConstant = smoothingTime;
+
+  function setupHPF() {
+    hpf = audioCtx.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.value = parseFloat(hpfFreq.value);
+  }
+  setupHPF();
+
+  function connectAudio() {
+    if(hpfToggle.checked) source.connect(hpf).connect(analyser);
+    else source.connect(analyser);
+  }
+  connectAudio();
+
+  hpfToggle.addEventListener('change', connectAudio);
+  hpfFreq.addEventListener('change', () => {
+    if(hpf) hpf.frequency.value = parseFloat(hpfFreq.value);
+  });
+
+  hamburger.addEventListener('click', () => {
+    settings.style.display = settings.style.display === 'none' ? 'block' : 'none';
+  });
+
+  canvas.addEventListener('click', async () => {
+    running = !running;
+    if(running) await audioCtx.resume();
+    else await audioCtx.suspend();
+  });
+
+  startBtn.addEventListener('click', () => {
+    welcome.style.display = 'none';
+    running = true;
+    draw();
+  });
+
+  function draw() {
+    if(!running) { requestAnimationFrame(draw); return; }
+
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0,0,width,height);
+
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+
+    const sampleRate = audioCtx.sampleRate;
+
+    // Strongest frequency only
+    let maxIndex = 0;
+    for(let i=0;i<data.length;i++){
+      if(data[i] > data[maxIndex]) maxIndex = i;
+    }
+    const strongestFreq = Math.round(maxIndex*sampleRate/analyser.fftSize);
+    info.textContent = `Strongest: ${strongestFreq} Hz`;
+
+    // Draw grid
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+
+    // X-axis lines and labels
+    const minFreq = 20;
+    const maxFreq = 20000;
+    const freqs = [];
+    for(let f=10; f<100; f+=10) freqs.push(f);
+    for(let f=100; f<1000; f+=100) freqs.push(f);
+    for(let f=1000; f<10000; f+=1000) freqs.push(f);
+    freqs.push(20000);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '12px sans-serif';
+    freqs.forEach(f => {
+      const x = Math.log10(f/minFreq)/Math.log10(maxFreq/minFreq)*width;
+      ctx.moveTo(x,0);
+      ctx.lineTo(x,height);
+      ctx.fillText(f>=1000?f/1000+'k':f, x+2, height-2);
+    });
+
+    // Y-axis lines every 10 dB
+    for(let db=0; db<=255; db+=32){
+      const y = height - db/255*height;
+      ctx.moveTo(0,y);
+      ctx.lineTo(width,y);
+      ctx.fillText(`${Math.round(db/255*80)} dB`, 5, y-2);
+    }
+    ctx.stroke();
+
+    // Draw spectrum
+    ctx.strokeStyle = '#0f0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for(let i=0;i<data.length;i++){
+      const freq = i*sampleRate/analyser.fftSize;
+      if(freq<minFreq) continue;
+      const x = Math.log10(freq/minFreq)/Math.log10(maxFreq/minFreq)*width;
+      const y = height - (data[i]/255)*height;
+      if(i===0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    requestAnimationFrame(draw);
+  }
+})();
+</script>
+
+</body>
+</html>
