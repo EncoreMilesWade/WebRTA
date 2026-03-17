@@ -108,8 +108,9 @@
     else await audioCtx.suspend();
   });
 
-  startBtn.addEventListener('click', () => {
-    welcome.style.display = 'none';
+  startBtn.addEventListener('click', async () => {
+    await audioCTX.resume();
+	welcome.style.display = 'none';
     running = true;
     draw();
   });
