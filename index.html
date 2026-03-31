@@ -106,11 +106,13 @@
     canvas.height = window.innerHeight;
   }
   window.addEventListener('resize', resizeCanvas);
+  
 window.addEventListener('orientationchange', () => {
   setTimeout(() => {
   }, 300);
     window.scrollTo(0, 100);
 	});
+	
   resizeCanvas();
 
   analyser = audioCtx.createAnalyser();
