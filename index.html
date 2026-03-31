@@ -172,6 +172,7 @@ const pausedOverlay = document.getElementById('pausedOverlay');
 	audioCtx.resume();
 		
     setTimeout(() => {
+	window.scrollTo(0, 100);
 		running = true;
 		draw();
 	}, 300);
