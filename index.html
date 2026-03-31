@@ -108,9 +108,9 @@
   window.addEventListener('resize', resizeCanvas);
 window.addEventListener('orientationchange', () => {
   setTimeout(() => {
-    window.scrollTo(0, 100);
   }, 300);
-});
+    window.scrollTo(0, 100);
+	});
   resizeCanvas();
 
   analyser = audioCtx.createAnalyser();
@@ -172,7 +172,6 @@ const pausedOverlay = document.getElementById('pausedOverlay');
 	audioCtx.resume();
 		
     setTimeout(() => {
-	window.scrollTo(0, 100);
 		running = true;
 		draw();
 	}, 300);
