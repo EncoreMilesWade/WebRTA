@@ -200,23 +200,53 @@ const pausedOverlay = document.getElementById('pausedOverlay');
     ctx.lineWidth = 1;
     ctx.beginPath();
 
-    // X-axis lines and labels
+    // X-axis lines & labels
     const minFreq = 20;
     const maxFreq = 20000;
     const freqs = [];
-    for(let f=10; f<100; f+=10) freqs.push(f);
-    for(let f=100; f<1000; f+=100) freqs.push(f);
-    for(let f=1000; f<10000; f+=1000) freqs.push(f);
-    freqs.push(20000);
+for (let f = 10; f < 100; f += 10) freqs.push(f);
+for (let f = 100; f < 1000; f += 100) freqs.push(f);
+for (let f = 1000; f < 10000; f += 1000) freqs.push(f);
+freqs.push(20000);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = '12px sans-serif';
-    freqs.forEach(f => {
-      const x = Math.log10(f/minFreq)/Math.log10(maxFreq/minFreq)*width;
-      ctx.moveTo(x,0);
-      ctx.lineTo(x,height);
-      ctx.fillText(f>=1000?f/1000+'k':f, x+2, height-2);
-    });
+freqs.forEach(f => {
+  const x = Math.log10(f / minFreq) / Math.log10(maxFreq / minFreq) * width;
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, height);
+});
+
+ctx.stroke();
+
+// Assign priority
+function getPriority(f) {
+  if (f === 100 || f === 1000 || f === 10000) return 3; // highest
+  if (f === 20 || f === 50 || f === 200 || f === 500 || f === 2000 || f === 5000) return 2;
+  return 1;
+}
+
+// Sort by priority (high first), but keep frequency order
+const sorted = [...freqs].sort((a, b) => getPriority(b) - getPriority(a));
+
+const drawnPositions = [];
+
+ctx.fillStyle = '#fff';
+ctx.font = '12px sans-serif';
+
+sorted.forEach(f => {
+  const x = Math.log10(f / minFreq) / Math.log10(maxFreq / minFreq) * width;
+
+  const label = f >= 1000 ? (f / 1000) + 'k' : f.toString();
+
+  const minSpacing = 40; // pixels between labels
+
+  // Check overlap
+  const overlaps = drawnPositions.some(px => Math.abs(px - x) < minSpacing);
+
+  if (!overlaps) {
+    ctx.fillText(label, x + 2, height - 2);
+    drawnPositions.push(x);
+  }
+});
 
     // Y-axis lines every 10 dB
     for(let db=0; db<=255; db+=32){
