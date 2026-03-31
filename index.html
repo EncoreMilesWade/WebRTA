@@ -107,15 +107,9 @@
   }
   window.addEventListener('resize', resizeCanvas);
   
-function handleViewportChange() {
-  // wait for Safari to finish layout updates
-  setTimeout(() => {
-    window.scrollTo(0, 120);
-  }, 500); // longer delay is key on iOS
+function isLandscape() {
+  return window.matchMedia("(orientation: landscape)").matches;
 }
-
-window.addEventListener('orientationchange', handleViewportChange);
-window.addEventListener('resize', handleViewportChange);
 	
   resizeCanvas();
 
